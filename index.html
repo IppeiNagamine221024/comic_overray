@@ -10,23 +10,44 @@
 <body>
   <!-- 背景はクロマキー用の緑。画面キャプチャ＋OBS の色キーで透過させる -->
   <div id="app" class="app" aria-live="polite" aria-atomic="true">
-    <!-- エラー・案内メッセージ（配信前の確認用。認識開始後は非表示にできる） -->
-    <div id="status-panel" class="status-panel" role="status">
-      <p id="status-message" class="status-message">マイクと音声認識の準備中です…</p>
-      <p class="status-hint"><kbd>Esc</kbd> キーで認識とマイクを停止できます（ブラウザソースにフォーカスがあるとき）。</p>
-      <button id="start-button" type="button" class="start-button">認識を開始</button>
-    </div>
+    <!-- 上部：吹き出しプレビュー用ステージ -->
+    <div class="stage-area" id="stage-area">
+      <div id="status-panel" class="status-panel" role="status">
+        <p id="status-message" class="status-message">マイクと音声認識の準備中です…</p>
+        <p class="status-hint"><kbd>Esc</kbd> キーで認識とマイクを停止できます（ブラウザソースにフォーカスがあるとき）。</p>
+        <button id="start-button" type="button" class="start-button">認識を開始</button>
+      </div>
 
-    <!-- 吹き出し本体：音量レベルに応じて data-volume-tier を切り替える -->
-    <div id="bubble-wrap" class="bubble-wrap bubble-wrap--hidden" data-volume-tier="normal" aria-hidden="true">
-      <!-- 外側：出現アニメ。内側：大声時の振動のみ（キーフレーム競合を防ぐ） -->
-      <div class="bubble-shaker">
-        <div id="bubble" class="bubble">
-          <p id="subtitle" class="subtitle"></p>
+      <div id="bubble-wrap" class="bubble-wrap bubble-wrap--hidden" data-volume-tier="normal" aria-hidden="true">
+        <div class="bubble-shaker">
+          <div id="bubble" class="bubble">
+            <p id="subtitle" class="subtitle"></p>
+          </div>
+          <div class="bubble-tail" aria-hidden="true"></div>
         </div>
-        <div class="bubble-tail" aria-hidden="true"></div>
       </div>
     </div>
+
+    <!-- 下部：見た目のカスタマイズ -->
+    <aside class="settings-panel" id="settings-panel" aria-label="表示設定">
+      <h2 class="settings-panel__title">表示設定</h2>
+      <p class="settings-panel__note">フォントと文字色は自動で保存され、次回開いたときに復元されます。</p>
+      <div class="settings-panel__row">
+        <label class="settings-panel__label" for="font-preset-select">フォント</label>
+        <select id="font-preset-select" class="settings-panel__select">
+          <option value="default">デフォルト（ゴシック系）</option>
+          <option value="gothic">メイリオ・ヒラギノ優先</option>
+          <option value="yugo">游ゴシック</option>
+          <option value="msgothic">MS ゴシック体</option>
+          <option value="mincho">明朝体</option>
+        </select>
+      </div>
+      <div class="settings-panel__row settings-panel__row--inline">
+        <label class="settings-panel__label" for="text-color-input">文字の色</label>
+        <input id="text-color-input" class="settings-panel__color" type="color" value="#111111" title="字幕の文字色" />
+        <span id="text-color-hex" class="settings-panel__hex" aria-hidden="true">#111111</span>
+      </div>
+    </aside>
   </div>
 
   <script src="script.js"></script>

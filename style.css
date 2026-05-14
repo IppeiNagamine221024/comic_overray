@@ -1,10 +1,16 @@
 /* =============================================================================
-   OBS用：背景完全透明（ブラウザソースで合成しやすい）
+   画面キャプチャ＋クロマキー用（緑背景）／上下分割レイアウト
    ============================================================================= */
 *,
 *::before,
 *::after {
   box-sizing: border-box;
+}
+
+/* 字幕まわりのカスタマイズ用（JavaScript から上書き） */
+:root {
+  --subtitle-font-family: "Segoe UI", "Hiragino Sans", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+  --subtitle-color: #111111;
 }
 
 html,
@@ -19,19 +25,30 @@ body {
   font-family: "Segoe UI", "Hiragino Sans", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
 }
 
-/* GPU合成を意識：transform のみで動かす箇所には will-change を限定利用 */
+/* 縦分割：上＝吹き出し、下＝設定 */
 .app {
-  position: relative;
+  display: flex;
+  flex-direction: column;
   width: 100%;
   height: 100%;
+  min-height: 0;
   pointer-events: auto;
+}
+
+/* 上部ステージ（吹き出しエリア） */
+.stage-area {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  /* 吹き出しをステージ上部寄りに置く */
+  display: block;
 }
 
 /* -----------------------------------------------------------------------------
    ステータスパネル（起動時のみ操作）
    ----------------------------------------------------------------------------- */
 .status-panel {
-  position: fixed;
+  position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
@@ -65,7 +82,6 @@ body {
   font-size: 0.75rem;
 }
 
-
 .start-button {
   cursor: pointer;
   padding: 0.6rem 1.2rem;
@@ -97,12 +113,13 @@ body {
 }
 
 /* -----------------------------------------------------------------------------
-   吹き出し配置：画面下中央。しっぽは左（左下のキャラ想定）
+   吹き出し：ステージ上部寄り・中央。しっぽは左（キャラ方向）
    ----------------------------------------------------------------------------- */
 .bubble-wrap {
-  position: fixed;
+  position: absolute;
   left: 50%;
-  bottom: 6vh;
+  top: 10vh;
+  bottom: auto;
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;
@@ -112,12 +129,10 @@ body {
   min-width: 0;
   z-index: 5;
   opacity: 0;
-  transform-origin: 50% 100%;
-  /* 表示アニメ：scale + fade + bounce 風（キーフレームで合成） */
+  transform-origin: 50% 0%;
   animation: bubble-pop-in 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
-/* 大声時の振動は内側ラッパーのみに適用（外側の出現アニメと分離） */
 .bubble-shaker {
   display: flex;
   flex-direction: column;
@@ -149,7 +164,6 @@ body {
   }
 }
 
-/* 大声時：振動（GPU負荷を抑えるため transform のみ） */
 .bubble-wrap[data-volume-tier="loud"] .bubble-shaker {
   animation: bubble-shake 0.12s infinite;
   will-change: transform;
@@ -173,7 +187,6 @@ body {
   }
 }
 
-/* しっぽ：左寄せ（キャラ方向） */
 .bubble-tail {
   position: absolute;
   left: 12%;
@@ -189,7 +202,6 @@ body {
   z-index: 0;
 }
 
-/* 小声：半透明・破線枠 */
 .bubble-wrap[data-volume-tier="quiet"] .bubble {
   opacity: 0.72;
   border-style: dashed;
@@ -201,13 +213,11 @@ body {
   border-style: dashed;
 }
 
-/* 通常：漫画風の太枠・影 */
 .bubble-wrap[data-volume-tier="normal"] .bubble {
   opacity: 1;
   border-style: solid;
 }
 
-/* 大声：ギザギザ（clip-path）・強調 */
 .bubble-wrap[data-volume-tier="loud"] .bubble {
   border-radius: 0;
   border: none;
@@ -252,7 +262,6 @@ body {
   max-width: 70vw;
   min-width: 120px;
   background: #fff;
-  color: #111;
   border-radius: 22px;
   border: 5px solid #111;
   box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.28);
@@ -262,11 +271,12 @@ body {
 
 .subtitle {
   margin: 0;
+  font-family: var(--subtitle-font-family);
+  color: var(--subtitle-color);
   font-size: clamp(1.05rem, 2.2vw, 1.55rem);
   font-weight: 800;
   line-height: 1.45;
   letter-spacing: 0.02em;
-  /* 縁取り：可読性重視（漫画のドロップシャドウ風） */
   text-shadow:
     2px 0 0 #fff,
     -2px 0 0 #fff,
@@ -279,16 +289,93 @@ body {
     0 0 6px rgba(0, 0, 0, 0.25);
 }
 
+/* 大声時は色は変数のまま、発光だけ追加 */
 .bubble-wrap[data-volume-tier="loud"] .subtitle {
-  color: #1a0505;
   text-shadow:
-    2px 0 0 #ffecec,
-    -2px 0 0 #ffecec,
-    0 2px 0 #ffecec,
-    0 -2px 0 #ffecec,
-    2px 2px 0 #ffecec,
-    -2px 2px 0 #ffecec,
-    2px -2px 0 #ffecec,
-    -2px -2px 0 #ffecec,
+    2px 0 0 #fff,
+    -2px 0 0 #fff,
+    0 2px 0 #fff,
+    0 -2px 0 #fff,
+    2px 2px 0 #fff,
+    -2px 2px 0 #fff,
+    2px -2px 0 #fff,
+    -2px -2px 0 #fff,
     0 0 10px rgba(255, 80, 80, 0.65);
+}
+
+/* -----------------------------------------------------------------------------
+   下部：設定パネル（クロマキー時も操作しやすいコントラスト）
+   ----------------------------------------------------------------------------- */
+.settings-panel {
+  flex: 0 0 auto;
+  padding: 0.65rem 1rem 0.85rem;
+  background: rgba(0, 0, 0, 0.78);
+  color: #f5f5f5;
+  border-top: 3px solid #fff;
+  box-shadow: 0 -4px 0 rgba(0, 0, 0, 0.25);
+  z-index: 20;
+}
+
+.settings-panel__title {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.settings-panel__note {
+  margin: 0 0 0.65rem;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  opacity: 0.88;
+}
+
+.settings-panel__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.settings-panel__row:last-child {
+  margin-bottom: 0;
+}
+
+.settings-panel__row--inline {
+  align-items: center;
+}
+
+.settings-panel__label {
+  flex: 0 0 5.5rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.settings-panel__select {
+  flex: 1 1 160px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.9rem;
+  color: #111;
+  background: #fff;
+  border: 2px solid #111;
+  border-radius: 8px;
+}
+
+.settings-panel__color {
+  width: 44px;
+  height: 36px;
+  padding: 0;
+  border: 2px solid #fff;
+  border-radius: 8px;
+  cursor: pointer;
+  background: transparent;
+}
+
+.settings-panel__hex {
+  font-size: 0.8rem;
+  font-family: ui-monospace, monospace;
+  opacity: 0.9;
 }

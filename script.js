@@ -32,6 +32,27 @@ const ANALYSER_FFT_SIZE = 512;
 /** 連続認識が勝手に終了した場合の自動再開までの待ち ms */
 const RECOGNITION_RESTART_MS = 400;
 
+/** 表示設定（フォント・色）の localStorage キー */
+const STORAGE_APPEARANCE_KEY = "comic_overlay_appearance_v1";
+
+/**
+ * フォントプリセット（select の value と対応）
+ * OS にインストール済みのフォント名を優先したスタック
+ */
+const FONT_PRESETS = {
+  default: '"Segoe UI","Hiragino Sans","Hiragino Kaku Gothic ProN",Meiryo,sans-serif',
+  gothic: 'Meiryo,"Hiragino Kaku Gothic ProN","Hiragino Sans",sans-serif',
+  yugo: '"Yu Gothic UI","Yu Gothic",YuGothic,"Meiryo",sans-serif',
+  msgothic: '"MS PGothic","MS Gothic","Hiragino Kaku Gothic ProN",sans-serif',
+  mincho: '"Yu Mincho","YuMincho","MS PMincho","Hiragino Mincho ProN",serif',
+};
+
+/** 初回表示時の見た目デフォルト */
+const DEFAULT_APPEARANCE = {
+  fontPreset: "default",
+  textColor: "#111111",
+};
+
 // -----------------------------------------------------------------------------
 // グローバル参照（クリーンアップ用に保持）
 // -----------------------------------------------------------------------------
@@ -64,6 +85,9 @@ const statusMessage = document.getElementById("status-message");
 const startButton = document.getElementById("start-button");
 const bubbleWrap = document.getElementById("bubble-wrap");
 const subtitleEl = document.getElementById("subtitle");
+const fontPresetSelect = document.getElementById("font-preset-select");
+const textColorInput = document.getElementById("text-color-input");
+const textColorHex = document.getElementById("text-color-hex");
 
 // -----------------------------------------------------------------------------
 // ユーティリティ
@@ -75,6 +99,115 @@ const subtitleEl = document.getElementById("subtitle");
  */
 function getSpeechRecognitionCtor() {
   return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+}
+
+/**
+ * localStorage から表示設定を読み込む（壊れた JSON はデフォルトへ）
+ * @returns {{ fontPreset: string, textColor: string }}
+ */
+function loadAppearance() {
+  try {
+    const raw = localStorage.getItem(STORAGE_APPEARANCE_KEY);
+    if (!raw) {
+      return { ...DEFAULT_APPEARANCE };
+    }
+    const parsed = JSON.parse(raw);
+    const fontPreset =
+      typeof parsed.fontPreset === "string" && parsed.fontPreset in FONT_PRESETS
+        ? parsed.fontPreset
+        : DEFAULT_APPEARANCE.fontPreset;
+    const textColor =
+      typeof parsed.textColor === "string" && /^#[0-9a-fA-F]{6}$/.test(parsed.textColor)
+        ? parsed.textColor
+        : DEFAULT_APPEARANCE.textColor;
+    return { fontPreset, textColor };
+  } catch {
+    return { ...DEFAULT_APPEARANCE };
+  }
+}
+
+/**
+ * 表示設定を localStorage に保存（失敗してもアプリは継続）
+ * @param {{ fontPreset: string, textColor: string }} state
+ */
+function saveAppearance(state) {
+  try {
+    localStorage.setItem(STORAGE_APPEARANCE_KEY, JSON.stringify(state));
+  } catch {
+    // プライベートモード等では保存できない場合がある
+  }
+}
+
+/**
+ * CSS 変数へ反映（字幕の font-family / color）
+ * @param {{ fontPreset: string, textColor: string }} state
+ */
+function applyAppearanceToDocument(state) {
+  const stack = FONT_PRESETS[state.fontPreset] || FONT_PRESETS.default;
+  document.documentElement.style.setProperty("--subtitle-font-family", stack);
+  document.documentElement.style.setProperty("--subtitle-color", state.textColor);
+}
+
+/**
+ * フォームの値を表示設定オブジェクトにそろえる
+ * @returns {{ fontPreset: string, textColor: string }}
+ */
+function readAppearanceFromForm() {
+  const fontPreset =
+    fontPresetSelect && fontPresetSelect.value in FONT_PRESETS
+      ? fontPresetSelect.value
+      : DEFAULT_APPEARANCE.fontPreset;
+  const textColor = textColorInput && /^#[0-9a-fA-F]{6}$/.test(textColorInput.value)
+    ? textColorInput.value
+    : DEFAULT_APPEARANCE.textColor;
+  return { fontPreset, textColor };
+}
+
+/**
+ * 保存済み設定をフォームに流し込む
+ * @param {{ fontPreset: string, textColor: string }} state
+ */
+function syncFormFromAppearance(state) {
+  if (fontPresetSelect) {
+    fontPresetSelect.value = state.fontPreset in FONT_PRESETS ? state.fontPreset : "default";
+  }
+  if (textColorInput) {
+    textColorInput.value = state.textColor;
+  }
+  if (textColorHex) {
+    textColorHex.textContent = state.textColor;
+  }
+}
+
+/**
+ * 下部パネル：フォント・文字色の変更を監視して即時反映＆保存
+ */
+function initAppearanceControls() {
+  if (!fontPresetSelect || !textColorInput) {
+    return;
+  }
+
+  const initial = loadAppearance();
+  applyAppearanceToDocument(initial);
+  syncFormFromAppearance(initial);
+
+  fontPresetSelect.addEventListener("change", () => {
+    const state = readAppearanceFromForm();
+    applyAppearanceToDocument(state);
+    saveAppearance(state);
+  });
+
+  textColorInput.addEventListener("input", () => {
+    const state = readAppearanceFromForm();
+    applyAppearanceToDocument(state);
+    if (textColorHex) {
+      textColorHex.textContent = state.textColor;
+    }
+  });
+
+  textColorInput.addEventListener("change", () => {
+    saveAppearance(readAppearanceFromForm());
+  });
 }
 
 /**
@@ -492,6 +625,8 @@ function init() {
       handleUserStopAll();
     }
   });
+
+  initAppearanceControls();
 
   const Ctor = getSpeechRecognitionCtor();
   if (!Ctor) {
