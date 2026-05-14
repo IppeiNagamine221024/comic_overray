@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>漫画風リアルタイム字幕オーバーレイ（OBS用）</title>
+  <!-- OBSブラウザソースはローカルファイルまたはローカルサーバーから読み込み可能 -->
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- 背景は透明のまま。OBSで合成しやすくする -->
+  <div id="app" class="app" aria-live="polite" aria-atomic="true">
+    <!-- エラー・案内メッセージ（配信前の確認用。認識開始後は非表示にできる） -->
+    <div id="status-panel" class="status-panel" role="status">
+      <p id="status-message" class="status-message">マイクと音声認識の準備中です…</p>
+      <p class="status-hint"><kbd>Esc</kbd> キーで認識とマイクを停止できます（ブラウザソースにフォーカスがあるとき）。</p>
+      <button id="start-button" type="button" class="start-button">認識を開始</button>
+    </div>
+
+    <!-- 吹き出し本体：音量レベルに応じて data-volume-tier を切り替える -->
+    <div id="bubble-wrap" class="bubble-wrap bubble-wrap--hidden" data-volume-tier="normal" aria-hidden="true">
+      <!-- 外側：出現アニメ。内側：大声時の振動のみ（キーフレーム競合を防ぐ） -->
+      <div class="bubble-shaker">
+        <div id="bubble" class="bubble">
+          <p id="subtitle" class="subtitle"></p>
+        </div>
+        <div class="bubble-tail" aria-hidden="true"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
