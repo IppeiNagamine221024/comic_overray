@@ -14,8 +14,9 @@
 /** 音声認識の言語（日本語） */
 const SPEECH_LANG = "ja-JP";
 
-/** 字幕が最後の更新から何 ms 無音扱いで消えるか */
-const SUBTITLE_HIDE_DELAY_MS = 4000;
+/** 字幕が最後の更新から消えるまでの時間（下限・上限・初期値は秒ベースで UI と対応） */
+const SUBTITLE_HIDE_DELAY_MIN_MS = 1000;
+const SUBTITLE_HIDE_DELAY_MAX_MS = 120000;
 
 /** 音量の指数移動平均の係数（大きいほどなめらか・反応遅め） */
 const VOLUME_SMOOTHING = 0.88;
@@ -47,11 +48,19 @@ const FONT_PRESETS = {
   mincho: '"Yu Mincho","YuMincho","MS PMincho","Hiragino Mincho ProN",serif',
 };
 
-/** 初回表示時の見た目デフォルト */
+/** しっぽの向き（select の value・`data-tail-direction` と一致） */
+const TAIL_DIRECTIONS = ["left", "right", "bottom", "top-left", "top-right"];
+
+/** 初回表示時の見た目・挙動のデフォルト */
 const DEFAULT_APPEARANCE = {
   fontPreset: "default",
   textColor: "#111111",
+  tailDirection: "left",
+  subtitleHideDelayMs: 4000,
 };
+
+/** 現在の「字幕が消えるまで」の待ち時間（設定パネルと同期） */
+let subtitleHideDelayMs = DEFAULT_APPEARANCE.subtitleHideDelayMs;
 
 // -----------------------------------------------------------------------------
 // グローバル参照（クリーンアップ用に保持）
@@ -88,6 +97,8 @@ const subtitleEl = document.getElementById("subtitle");
 const fontPresetSelect = document.getElementById("font-preset-select");
 const textColorInput = document.getElementById("text-color-input");
 const textColorHex = document.getElementById("text-color-hex");
+const tailDirectionSelect = document.getElementById("tail-direction-select");
+const subtitleDurationInput = document.getElementById("subtitle-duration-input");
 
 // -----------------------------------------------------------------------------
 // ユーティリティ
@@ -102,8 +113,26 @@ function getSpeechRecognitionCtor() {
 }
 
 /**
+ * 字幕が消えるまでの待ち時間を許容範囲に収める
+ * @param {number} ms
+ * @returns {number}
+ */
+function clampSubtitleHideDelayMs(ms) {
+  const n = Math.round(Number(ms));
+  if (!Number.isFinite(n)) {
+    return DEFAULT_APPEARANCE.subtitleHideDelayMs;
+  }
+  return Math.min(SUBTITLE_HIDE_DELAY_MAX_MS, Math.max(SUBTITLE_HIDE_DELAY_MIN_MS, n));
+}
+
+/**
  * localStorage から表示設定を読み込む（壊れた JSON はデフォルトへ）
- * @returns {{ fontPreset: string, textColor: string }}
+ * @returns {{
+ *   fontPreset: string,
+ *   textColor: string,
+ *   tailDirection: string,
+ *   subtitleHideDelayMs: number
+ * }}
  */
 function loadAppearance() {
   try {
@@ -120,7 +149,15 @@ function loadAppearance() {
       typeof parsed.textColor === "string" && /^#[0-9a-fA-F]{6}$/.test(parsed.textColor)
         ? parsed.textColor
         : DEFAULT_APPEARANCE.textColor;
-    return { fontPreset, textColor };
+    const tailDirection =
+      typeof parsed.tailDirection === "string" && TAIL_DIRECTIONS.includes(parsed.tailDirection)
+        ? parsed.tailDirection
+        : DEFAULT_APPEARANCE.tailDirection;
+    const subtitleHideDelayMs =
+      typeof parsed.subtitleHideDelayMs === "number" && Number.isFinite(parsed.subtitleHideDelayMs)
+        ? clampSubtitleHideDelayMs(parsed.subtitleHideDelayMs)
+        : DEFAULT_APPEARANCE.subtitleHideDelayMs;
+    return { fontPreset, textColor, tailDirection, subtitleHideDelayMs };
   } catch {
     return { ...DEFAULT_APPEARANCE };
   }
@@ -128,7 +165,12 @@ function loadAppearance() {
 
 /**
  * 表示設定を localStorage に保存（失敗してもアプリは継続）
- * @param {{ fontPreset: string, textColor: string }} state
+ * @param {{
+ *   fontPreset: string,
+ *   textColor: string,
+ *   tailDirection: string,
+ *   subtitleHideDelayMs: number
+ * }} state
  */
 function saveAppearance(state) {
   try {
@@ -139,18 +181,38 @@ function saveAppearance(state) {
 }
 
 /**
- * CSS 変数へ反映（字幕の font-family / color）
- * @param {{ fontPreset: string, textColor: string }} state
+ * CSS 変数・吹き出し属性・字幕タイマー用の待ち時間へ反映
+ * @param {{
+ *   fontPreset: string,
+ *   textColor: string,
+ *   tailDirection: string,
+ *   subtitleHideDelayMs: number
+ * }} state
  */
 function applyAppearanceToDocument(state) {
   const stack = FONT_PRESETS[state.fontPreset] || FONT_PRESETS.default;
   document.documentElement.style.setProperty("--subtitle-font-family", stack);
   document.documentElement.style.setProperty("--subtitle-color", state.textColor);
+
+  if (bubbleWrap) {
+    const tail =
+      typeof state.tailDirection === "string" && TAIL_DIRECTIONS.includes(state.tailDirection)
+        ? state.tailDirection
+        : DEFAULT_APPEARANCE.tailDirection;
+    bubbleWrap.setAttribute("data-tail-direction", tail);
+  }
+
+  subtitleHideDelayMs = clampSubtitleHideDelayMs(state.subtitleHideDelayMs);
 }
 
 /**
  * フォームの値を表示設定オブジェクトにそろえる
- * @returns {{ fontPreset: string, textColor: string }}
+ * @returns {{
+ *   fontPreset: string,
+ *   textColor: string,
+ *   tailDirection: string,
+ *   subtitleHideDelayMs: number
+ * }}
  */
 function readAppearanceFromForm() {
   const fontPreset =
@@ -160,12 +222,31 @@ function readAppearanceFromForm() {
   const textColor = textColorInput && /^#[0-9a-fA-F]{6}$/.test(textColorInput.value)
     ? textColorInput.value
     : DEFAULT_APPEARANCE.textColor;
-  return { fontPreset, textColor };
+  const tailDirection =
+    tailDirectionSelect && TAIL_DIRECTIONS.includes(tailDirectionSelect.value)
+      ? tailDirectionSelect.value
+      : DEFAULT_APPEARANCE.tailDirection;
+
+  let seconds = DEFAULT_APPEARANCE.subtitleHideDelayMs / 1000;
+  if (subtitleDurationInput && subtitleDurationInput.value !== "") {
+    const n = Number(subtitleDurationInput.value);
+    if (Number.isFinite(n)) {
+      seconds = n;
+    }
+  }
+  const subtitleHideDelayMs = clampSubtitleHideDelayMs(seconds * 1000);
+
+  return { fontPreset, textColor, tailDirection, subtitleHideDelayMs };
 }
 
 /**
  * 保存済み設定をフォームに流し込む
- * @param {{ fontPreset: string, textColor: string }} state
+ * @param {{
+ *   fontPreset: string,
+ *   textColor: string,
+ *   tailDirection: string,
+ *   subtitleHideDelayMs: number
+ * }} state
  */
 function syncFormFromAppearance(state) {
   if (fontPresetSelect) {
@@ -177,10 +258,32 @@ function syncFormFromAppearance(state) {
   if (textColorHex) {
     textColorHex.textContent = state.textColor;
   }
+  if (tailDirectionSelect) {
+    tailDirectionSelect.value = TAIL_DIRECTIONS.includes(state.tailDirection)
+      ? state.tailDirection
+      : DEFAULT_APPEARANCE.tailDirection;
+  }
+  if (subtitleDurationInput) {
+    const sec = clampSubtitleHideDelayMs(state.subtitleHideDelayMs) / 1000;
+    subtitleDurationInput.value = String(Math.round(sec));
+  }
 }
 
 /**
- * 下部パネル：フォント・文字色の変更を監視して即時反映＆保存
+ * 字幕表示中に「消えるまで」の秒数だけ変えたとき、残り時間を張り直す
+ */
+function reapplySubtitleTimerIfVisible() {
+  if (!bubbleWrap || bubbleWrap.classList.contains("bubble-wrap--hidden")) {
+    return;
+  }
+  if (!subtitleEl || !subtitleEl.textContent.trim()) {
+    return;
+  }
+  armSubtitleHideTimer();
+}
+
+/**
+ * 下部パネル：フォント・色・しっぽ・表示時間の変更を監視して即時反映＆保存
  */
 function initAppearanceControls() {
   if (!fontPresetSelect || !textColorInput) {
@@ -208,6 +311,29 @@ function initAppearanceControls() {
   textColorInput.addEventListener("change", () => {
     saveAppearance(readAppearanceFromForm());
   });
+
+  if (tailDirectionSelect) {
+    tailDirectionSelect.addEventListener("change", () => {
+      const state = readAppearanceFromForm();
+      applyAppearanceToDocument(state);
+      saveAppearance(state);
+    });
+  }
+
+  if (subtitleDurationInput) {
+    subtitleDurationInput.addEventListener("input", () => {
+      const state = readAppearanceFromForm();
+      applyAppearanceToDocument(state);
+      reapplySubtitleTimerIfVisible();
+    });
+    subtitleDurationInput.addEventListener("change", () => {
+      const state = readAppearanceFromForm();
+      applyAppearanceToDocument(state);
+      syncFormFromAppearance(state);
+      saveAppearance(state);
+      reapplySubtitleTimerIfVisible();
+    });
+  }
 }
 
 /**
@@ -286,7 +412,7 @@ function armSubtitleHideTimer() {
   subtitleHideTimerId = setTimeout(() => {
     subtitleHideTimerId = null;
     hideSubtitle();
-  }, SUBTITLE_HIDE_DELAY_MS);
+  }, subtitleHideDelayMs);
 }
 
 /**

@@ -18,7 +18,13 @@
         <button id="start-button" type="button" class="start-button">認識を開始</button>
       </div>
 
-      <div id="bubble-wrap" class="bubble-wrap bubble-wrap--hidden" data-volume-tier="normal" aria-hidden="true">
+      <div
+        id="bubble-wrap"
+        class="bubble-wrap bubble-wrap--hidden"
+        data-volume-tier="normal"
+        data-tail-direction="left"
+        aria-hidden="true"
+      >
         <div class="bubble-shaker">
           <div id="bubble" class="bubble">
             <p id="subtitle" class="subtitle"></p>
@@ -31,7 +37,7 @@
     <!-- 下部：見た目のカスタマイズ -->
     <aside class="settings-panel" id="settings-panel" aria-label="表示設定">
       <h2 class="settings-panel__title">表示設定</h2>
-      <p class="settings-panel__note">フォントと文字色は自動で保存され、次回開いたときに復元されます。</p>
+      <p class="settings-panel__note">ここでの変更は自動で保存され、次回開いたときに復元されます。</p>
       <div class="settings-panel__row">
         <label class="settings-panel__label" for="font-preset-select">フォント</label>
         <select id="font-preset-select" class="settings-panel__select">
@@ -46,6 +52,30 @@
         <label class="settings-panel__label" for="text-color-input">文字の色</label>
         <input id="text-color-input" class="settings-panel__color" type="color" value="#111111" title="字幕の文字色" />
         <span id="text-color-hex" class="settings-panel__hex" aria-hidden="true">#111111</span>
+      </div>
+      <div class="settings-panel__row">
+        <label class="settings-panel__label" for="tail-direction-select">しっぽの向き</label>
+        <select id="tail-direction-select" class="settings-panel__select">
+          <option value="left">左下へ（左のキャラ向け）</option>
+          <option value="right">右下へ（右のキャラ向け）</option>
+          <option value="bottom">下中央へ</option>
+          <option value="top-left">左上へ（キャラが左下のとき）</option>
+          <option value="top-right">右上へ（キャラが右下のとき）</option>
+        </select>
+      </div>
+      <div class="settings-panel__row settings-panel__row--inline">
+        <label class="settings-panel__label" for="subtitle-duration-input">消えるまで</label>
+        <input
+          id="subtitle-duration-input"
+          class="settings-panel__number"
+          type="number"
+          min="1"
+          max="120"
+          step="1"
+          value="4"
+          title="字幕が最後の更新から消えるまでの秒数（1〜120）"
+        />
+        <span class="settings-panel__unit" aria-hidden="true">秒</span>
       </div>
     </aside>
   </div>
