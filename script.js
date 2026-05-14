@@ -2,9 +2,7 @@
  * 漫画風リアルタイム字幕オーバーレイ（OBS向け）
  * ------------------------------------------------------------
  * - Web Speech API（webkitSpeechRecognition）で日本語連続認識
- * - Web Audio API でマイク音量を解析し、吹き出しの見た目を3段階で変化
- * - requestAnimationFrame で音量ループ（無駄な setInterval を避ける）
- * - ページ離脱時にマイク・AudioContext・認識を解放（メモリリーク対策）
+ * - ページ離脱時に認識を解放（メモリリーク対策）
  */
 
 // -----------------------------------------------------------------------------
@@ -17,18 +15,6 @@ const SPEECH_LANG = "ja-JP";
 /** 字幕が最後の更新から消えるまでの時間（下限・上限・初期値は秒ベースで UI と対応） */
 const SUBTITLE_HIDE_DELAY_MIN_MS = 1000;
 const SUBTITLE_HIDE_DELAY_MAX_MS = 120000;
-
-/** 音量の指数移動平均の係数（大きいほどなめらか・反応遅め） */
-const VOLUME_SMOOTHING = 0.88;
-
-/** 音量段階のしきい値（0〜1 正規化 RMS ベース。環境に合わせて調整） */
-const VOLUME_TIER_THRESHOLDS = {
-  /** これ未満は「通常」。それ以上は「大声」 */
-  normalMax: 0.3,
-};
-
-/** AnalyserNode の時間領域バッファ長（小さめで軽量） */
-const ANALYSER_FFT_SIZE = 512;
 
 /** 連続認識が勝手に終了した場合の自動再開までの待ち ms */
 const RECOGNITION_RESTART_MS = 400;
@@ -80,17 +66,8 @@ let subtitleHideDelayMs = DEFAULT_APPEARANCE.subtitleHideDelayMs;
 // グローバル参照（クリーンアップ用に保持）
 // -----------------------------------------------------------------------------
 
-let mediaStream = null;
-let audioContext = null;
-let mediaSourceNode = null;
-let analyserNode = null;
-let timeDomainData = null;
-
 /** @type {SpeechRecognition | null} */
 let recognition = null;
-
-/** @type {number | null} */
-let volumeRafId = null;
 
 /** @type {ReturnType<typeof setTimeout> | null} */
 let subtitleHideTimerId = null;
@@ -98,9 +75,7 @@ let subtitleHideTimerId = null;
 /** @type {ReturnType<typeof setTimeout> | null} */
 let recognitionRestartTimerId = null;
 
-let smoothedLevel = 0;
 let userStopped = false;
-let volumeTier = "normal";
 
 // DOM
 const statusPanel = document.getElementById("status-panel");
@@ -413,26 +388,6 @@ function setStatusMessage(message) {
 }
 
 /**
- * 音量段階を決定
- * @param {number} level 0〜1
- * @returns {"quiet" | "normal" | "loud"}
- */
-function resolveVolumeTier(level) {
-  if (level < VOLUME_TIER_THRESHOLDS.normalMax) return "normal";
-  return "loud";
-}
-
-/**
- * 吹き出しの data 属性を更新（CSS が見た目を切り替える）
- * @param {"quiet" | "normal" | "loud"} tier
- */
-function applyVolumeTier(tier) {
-  if (tier === volumeTier) return;
-  volumeTier = tier;
-  bubbleWrap.setAttribute("data-volume-tier", tier);
-}
-
-/**
  * 吹き出し出現アニメを再発火（同じ文言でも「弾ける」見た目を維持したい場合に使える）
  */
 function replayBubbleEntrance() {
@@ -484,111 +439,6 @@ function armSubtitleHideTimer() {
 }
 
 /**
- * 音量解析ループ（requestAnimationFrame）
- * メモリ：バッファは一度だけ生成し使い回す
- */
-function volumeLoop() {
-  if (!analyserNode || !timeDomainData) {
-    volumeRafId = null;
-    return;
-  }
-
-  analyserNode.getByteTimeDomainData(timeDomainData);
-
-  let sumSquares = 0;
-  for (let i = 0; i < timeDomainData.length; i += 1) {
-    const v = (timeDomainData[i] - 128) / 128;
-    sumSquares += v * v;
-  }
-  const rms = Math.sqrt(sumSquares / timeDomainData.length);
-
-  // 0〜1 に正規化（実マイクではおおむね 0〜0.35 程度に収まることが多い）
-  const instant = Math.min(1, rms * 4.2);
-  smoothedLevel = smoothedLevel * VOLUME_SMOOTHING + instant * (1 - VOLUME_SMOOTHING);
-
-  applyVolumeTier(resolveVolumeTier(smoothedLevel));
-
-  volumeRafId = window.requestAnimationFrame(volumeLoop);
-}
-
-/**
- * Web Audio 周りの初期化
- * @param {MediaStream} stream
- */
-async function setupWebAudio(stream) {
-  teardownWebAudio();
-
-  audioContext = new (window.AudioContext || window.webkitAudioContext)();
-  // ユーザー操作後でも suspended になりうるため明示的に再開
-  if (audioContext.state === "suspended") {
-    await audioContext.resume();
-  }
-  mediaSourceNode = audioContext.createMediaStreamSource(stream);
-  analyserNode = audioContext.createAnalyser();
-  analyserNode.fftSize = ANALYSER_FFT_SIZE;
-  analyserNode.smoothingTimeConstant = 0.65;
-
-  mediaSourceNode.connect(analyserNode);
-  // スピーカーへは接続しない（OBS では不要＆ハウリング防止）
-
-  timeDomainData = new Uint8Array(analyserNode.fftSize);
-
-  if (volumeRafId !== null) {
-    cancelAnimationFrame(volumeRafId);
-  }
-  volumeRafId = window.requestAnimationFrame(volumeLoop);
-}
-
-/**
- * Web Audio の後始末
- */
-function teardownWebAudio() {
-  if (volumeRafId !== null) {
-    cancelAnimationFrame(volumeRafId);
-    volumeRafId = null;
-  }
-  if (analyserNode) {
-    try {
-      analyserNode.disconnect();
-    } catch {
-      // 既に切断済みでも安全に進める
-    }
-    analyserNode = null;
-  }
-  if (mediaSourceNode) {
-    try {
-      mediaSourceNode.disconnect();
-    } catch {
-      // noop
-    }
-    mediaSourceNode = null;
-  }
-  if (audioContext) {
-    audioContext.close().catch(() => {});
-    audioContext = null;
-  }
-  timeDomainData = null;
-  smoothedLevel = 0;
-  applyVolumeTier("normal");
-}
-
-/**
- * マイクストリームのトラック停止
- */
-function stopMediaTracks() {
-  if (mediaStream) {
-    mediaStream.getTracks().forEach((t) => {
-      try {
-        t.stop();
-      } catch {
-        // noop
-      }
-    });
-    mediaStream = null;
-  }
-}
-
-/**
  * 音声認識の停止とイベント解除
  */
 function teardownSpeechRecognition() {
@@ -615,8 +465,6 @@ function teardownSpeechRecognition() {
 function disposeAll() {
   userStopped = true;
   teardownSpeechRecognition();
-  teardownWebAudio();
-  stopMediaTracks();
   if (subtitleHideTimerId !== null) {
     clearTimeout(subtitleHideTimerId);
     subtitleHideTimerId = null;
@@ -648,7 +496,7 @@ function mapSpeechErrorToMessage(code) {
 
 /**
  * 音声認識をセットアップして開始
- * （マイクは getUserMedia で取得済み。認識エンジンはブラウザ既定の入力を使うことが多い）
+ * （マイクはブラウザ・OS の既定入力を使用）
  */
 function startSpeechRecognition() {
   const Ctor = getSpeechRecognitionCtor();
@@ -700,8 +548,6 @@ function startSpeechRecognition() {
     if (code === "not-allowed" || code === "service-not-allowed") {
       userStopped = true;
       teardownSpeechRecognition();
-      teardownWebAudio();
-      stopMediaTracks();
       startButton.disabled = false;
     }
   };
@@ -724,9 +570,6 @@ function startSpeechRecognition() {
     }, RECOGNITION_RESTART_MS);
   };
 
-  // 注意: Chrome の SpeechRecognition はデフォルト入力デバイスを使うことが多いです。
-  // getUserMedia で選んだマイクと一致しない場合は、OS の既定マイクを揃えてください。
-
   try {
     recognition.start();
   } catch (e) {
@@ -736,12 +579,12 @@ function startSpeechRecognition() {
 }
 
 /**
- * メイン開始処理：マイク取得 → Web Audio → 音声認識
+ * メイン開始処理：音声認識のみ開始
  */
-async function handleStartClick() {
+function handleStartClick() {
   userStopped = false;
   startButton.disabled = true;
-  setStatusMessage("マイクへのアクセスを要求しています…");
+  setStatusMessage("音声認識を開始しています…");
 
   const Ctor = getSpeechRecognitionCtor();
   if (!Ctor) {
@@ -750,35 +593,7 @@ async function handleStartClick() {
     return;
   }
 
-  try {
-    mediaStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        channelCount: 1,
-      },
-      video: false,
-    });
-  } catch (err) {
-    statusPanel.classList.remove("status-panel--hidden");
-    if (err && typeof err === "object" && "name" in err && err.name === "NotAllowedError") {
-      setStatusMessage("マイクの使用が拒否されました。ブラウザのサイト設定でマイクを許可してください。");
-    } else {
-      setStatusMessage(`マイクの取得に失敗しました: ${err instanceof Error ? err.message : String(err)}`);
-    }
-    startButton.disabled = false;
-    return;
-  }
-
-  try {
-    await setupWebAudio(mediaStream);
-    startSpeechRecognition();
-  } catch (e) {
-    setStatusMessage(`オーディオ初期化に失敗しました: ${e instanceof Error ? e.message : String(e)}`);
-    stopMediaTracks();
-    teardownWebAudio();
-    startButton.disabled = false;
-  }
+  startSpeechRecognition();
 }
 
 /**
@@ -787,8 +602,6 @@ async function handleStartClick() {
 function handleUserStopAll() {
   userStopped = true;
   teardownSpeechRecognition();
-  teardownWebAudio();
-  stopMediaTracks();
   hideSubtitle();
   statusPanel.classList.remove("status-panel--hidden");
   setStatusMessage("停止しました。再開する場合は「認識を開始」を押してください。");
@@ -807,9 +620,7 @@ function handleBeforeUnload() {
 // -----------------------------------------------------------------------------
 
 function init() {
-  startButton.addEventListener("click", () => {
-    void handleStartClick();
-  });
+  startButton.addEventListener("click", handleStartClick);
 
   window.addEventListener("beforeunload", handleBeforeUnload);
 
@@ -829,13 +640,7 @@ function init() {
     return;
   }
 
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    setStatusMessage("getUserMedia に対応していません。HTTPS または localhost で開いてください。");
-    startButton.disabled = true;
-    return;
-  }
-
-  setStatusMessage("準備完了です。「認識を開始」を押すとマイク許可と音声認識が始まります。");
+  setStatusMessage("準備完了です。「認識を開始」を押すと音声認識が始まります（マイク許可を求められることがあります）。");
 }
 
 document.addEventListener("DOMContentLoaded", init);

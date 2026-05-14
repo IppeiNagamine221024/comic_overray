@@ -13,18 +13,12 @@
     <!-- 上部：吹き出しプレビュー用ステージ -->
     <div class="stage-area" id="stage-area">
       <div id="status-panel" class="status-panel" role="status">
-        <p id="status-message" class="status-message">マイクと音声認識の準備中です…</p>
-        <p class="status-hint"><kbd>Esc</kbd> キーで認識とマイクを停止できます（ブラウザソースにフォーカスがあるとき）。</p>
+        <p id="status-message" class="status-message">音声認識の準備中です…</p>
+        <p class="status-hint"><kbd>Esc</kbd> キーで音声認識を停止できます（ブラウザソースにフォーカスがあるとき）。</p>
         <button id="start-button" type="button" class="start-button">認識を開始</button>
       </div>
 
-      <div
-        id="bubble-wrap"
-        class="bubble-wrap bubble-wrap--hidden"
-        data-volume-tier="normal"
-        data-tail-direction="left"
-        aria-hidden="true"
-      >
+      <div id="bubble-wrap" class="bubble-wrap bubble-wrap--hidden" data-tail-direction="left" aria-hidden="true">
         <div class="bubble-shaker">
           <div id="bubble" class="bubble">
             <p id="subtitle" class="subtitle"></p>
