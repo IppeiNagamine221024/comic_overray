@@ -14,7 +14,8 @@ body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: transparent;
+  /* 画面キャプチャ＋クロマキー合成用（OBS の「色キー」でこの色を透過させる） */
+  background: #00ff00;
   font-family: "Segoe UI", "Hiragino Sans", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
 }
 
