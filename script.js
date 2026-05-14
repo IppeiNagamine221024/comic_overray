@@ -22,8 +22,6 @@ const VOLUME_SMOOTHING = 0.88;
 
 /** 音量段階のしきい値（0〜1 正規化 RMS ベース。環境に合わせて調整） */
 const VOLUME_TIER_THRESHOLDS = {
-  /** これ未満は「小声」 */
-  quietMax: 0.025,
   /** これ未満は「通常」。それ以上は「大声」 */
   normalMax: 0.3,
 };
@@ -93,7 +91,6 @@ function setStatusMessage(message) {
  * @returns {"quiet" | "normal" | "loud"}
  */
 function resolveVolumeTier(level) {
-  if (level < VOLUME_TIER_THRESHOLDS.quietMax) return "quiet";
   if (level < VOLUME_TIER_THRESHOLDS.normalMax) return "normal";
   return "loud";
 }
