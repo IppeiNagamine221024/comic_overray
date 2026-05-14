@@ -61,7 +61,24 @@
           <option value="bottom">下中央へ</option>
           <option value="top-left">左上へ（キャラが左下のとき）</option>
           <option value="top-right">右上へ（キャラが右下のとき）</option>
+          <option value="side-left">左（左辺の中央）</option>
+          <option value="side-right">右（右辺の中央）</option>
+          <option value="side-top">上（上辺の中央）</option>
         </select>
+      </div>
+      <div class="settings-panel__row settings-panel__row--inline">
+        <label class="settings-panel__label" for="wrap-char-count-input">折り返し</label>
+        <input
+          id="wrap-char-count-input"
+          class="settings-panel__number settings-panel__number--wide"
+          type="number"
+          min="6"
+          max="80"
+          step="1"
+          value="24"
+          title="おおよその折り返し文字数（6〜80）。幅は 1ch 単位で計算します。"
+        />
+        <span class="settings-panel__unit" aria-hidden="true">文字</span>
       </div>
       <div class="settings-panel__row settings-panel__row--inline">
         <label class="settings-panel__label" for="subtitle-duration-input">消えるまで</label>

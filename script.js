@@ -49,7 +49,20 @@ const FONT_PRESETS = {
 };
 
 /** しっぽの向き（select の value・`data-tail-direction` と一致） */
-const TAIL_DIRECTIONS = ["left", "right", "bottom", "top-left", "top-right"];
+const TAIL_DIRECTIONS = [
+  "left",
+  "right",
+  "bottom",
+  "top-left",
+  "top-right",
+  "side-left",
+  "side-right",
+  "side-top",
+];
+
+/** 折り返し文字数の許容範囲（幅は CSS の `N * 1ch` で近似） */
+const WRAP_CHAR_MIN = 6;
+const WRAP_CHAR_MAX = 80;
 
 /** 初回表示時の見た目・挙動のデフォルト */
 const DEFAULT_APPEARANCE = {
@@ -57,6 +70,7 @@ const DEFAULT_APPEARANCE = {
   textColor: "#111111",
   tailDirection: "left",
   subtitleHideDelayMs: 4000,
+  wrapCharCount: 24,
 };
 
 /** 現在の「字幕が消えるまで」の待ち時間（設定パネルと同期） */
@@ -99,6 +113,7 @@ const textColorInput = document.getElementById("text-color-input");
 const textColorHex = document.getElementById("text-color-hex");
 const tailDirectionSelect = document.getElementById("tail-direction-select");
 const subtitleDurationInput = document.getElementById("subtitle-duration-input");
+const wrapCharCountInput = document.getElementById("wrap-char-count-input");
 
 // -----------------------------------------------------------------------------
 // ユーティリティ
@@ -126,12 +141,26 @@ function clampSubtitleHideDelayMs(ms) {
 }
 
 /**
+ * 折り返し文字数を許容範囲に収める
+ * @param {number} n
+ * @returns {number}
+ */
+function clampWrapCharCount(n) {
+  const rounded = Math.round(Number(n));
+  if (!Number.isFinite(rounded)) {
+    return DEFAULT_APPEARANCE.wrapCharCount;
+  }
+  return Math.min(WRAP_CHAR_MAX, Math.max(WRAP_CHAR_MIN, rounded));
+}
+
+/**
  * localStorage から表示設定を読み込む（壊れた JSON はデフォルトへ）
  * @returns {{
  *   fontPreset: string,
  *   textColor: string,
  *   tailDirection: string,
- *   subtitleHideDelayMs: number
+ *   subtitleHideDelayMs: number,
+ *   wrapCharCount: number
  * }}
  */
 function loadAppearance() {
@@ -157,7 +186,11 @@ function loadAppearance() {
       typeof parsed.subtitleHideDelayMs === "number" && Number.isFinite(parsed.subtitleHideDelayMs)
         ? clampSubtitleHideDelayMs(parsed.subtitleHideDelayMs)
         : DEFAULT_APPEARANCE.subtitleHideDelayMs;
-    return { fontPreset, textColor, tailDirection, subtitleHideDelayMs };
+    const wrapCharCount =
+      typeof parsed.wrapCharCount === "number" && Number.isFinite(parsed.wrapCharCount)
+        ? clampWrapCharCount(parsed.wrapCharCount)
+        : DEFAULT_APPEARANCE.wrapCharCount;
+    return { fontPreset, textColor, tailDirection, subtitleHideDelayMs, wrapCharCount };
   } catch {
     return { ...DEFAULT_APPEARANCE };
   }
@@ -169,7 +202,8 @@ function loadAppearance() {
  *   fontPreset: string,
  *   textColor: string,
  *   tailDirection: string,
- *   subtitleHideDelayMs: number
+ *   subtitleHideDelayMs: number,
+ *   wrapCharCount: number
  * }} state
  */
 function saveAppearance(state) {
@@ -186,13 +220,18 @@ function saveAppearance(state) {
  *   fontPreset: string,
  *   textColor: string,
  *   tailDirection: string,
- *   subtitleHideDelayMs: number
+ *   subtitleHideDelayMs: number,
+ *   wrapCharCount: number
  * }} state
  */
 function applyAppearanceToDocument(state) {
   const stack = FONT_PRESETS[state.fontPreset] || FONT_PRESETS.default;
   document.documentElement.style.setProperty("--subtitle-font-family", stack);
   document.documentElement.style.setProperty("--subtitle-color", state.textColor);
+  document.documentElement.style.setProperty(
+    "--subtitle-wrap-ch",
+    String(clampWrapCharCount(state.wrapCharCount ?? DEFAULT_APPEARANCE.wrapCharCount)),
+  );
 
   if (bubbleWrap) {
     const tail =
@@ -202,7 +241,9 @@ function applyAppearanceToDocument(state) {
     bubbleWrap.setAttribute("data-tail-direction", tail);
   }
 
-  subtitleHideDelayMs = clampSubtitleHideDelayMs(state.subtitleHideDelayMs);
+  subtitleHideDelayMs = clampSubtitleHideDelayMs(
+    state.subtitleHideDelayMs ?? DEFAULT_APPEARANCE.subtitleHideDelayMs,
+  );
 }
 
 /**
@@ -211,7 +252,8 @@ function applyAppearanceToDocument(state) {
  *   fontPreset: string,
  *   textColor: string,
  *   tailDirection: string,
- *   subtitleHideDelayMs: number
+ *   subtitleHideDelayMs: number,
+ *   wrapCharCount: number
  * }}
  */
 function readAppearanceFromForm() {
@@ -236,7 +278,16 @@ function readAppearanceFromForm() {
   }
   const subtitleHideDelayMs = clampSubtitleHideDelayMs(seconds * 1000);
 
-  return { fontPreset, textColor, tailDirection, subtitleHideDelayMs };
+  let wrapChars = DEFAULT_APPEARANCE.wrapCharCount;
+  if (wrapCharCountInput && wrapCharCountInput.value !== "") {
+    const w = Number(wrapCharCountInput.value);
+    if (Number.isFinite(w)) {
+      wrapChars = w;
+    }
+  }
+  const wrapCharCount = clampWrapCharCount(wrapChars);
+
+  return { fontPreset, textColor, tailDirection, subtitleHideDelayMs, wrapCharCount };
 }
 
 /**
@@ -245,7 +296,8 @@ function readAppearanceFromForm() {
  *   fontPreset: string,
  *   textColor: string,
  *   tailDirection: string,
- *   subtitleHideDelayMs: number
+ *   subtitleHideDelayMs: number,
+ *   wrapCharCount: number
  * }} state
  */
 function syncFormFromAppearance(state) {
@@ -266,6 +318,9 @@ function syncFormFromAppearance(state) {
   if (subtitleDurationInput) {
     const sec = clampSubtitleHideDelayMs(state.subtitleHideDelayMs) / 1000;
     subtitleDurationInput.value = String(Math.round(sec));
+  }
+  if (wrapCharCountInput) {
+    wrapCharCountInput.value = String(clampWrapCharCount(state.wrapCharCount));
   }
 }
 
@@ -332,6 +387,19 @@ function initAppearanceControls() {
       syncFormFromAppearance(state);
       saveAppearance(state);
       reapplySubtitleTimerIfVisible();
+    });
+  }
+
+  if (wrapCharCountInput) {
+    wrapCharCountInput.addEventListener("input", () => {
+      const state = readAppearanceFromForm();
+      applyAppearanceToDocument(state);
+    });
+    wrapCharCountInput.addEventListener("change", () => {
+      const state = readAppearanceFromForm();
+      applyAppearanceToDocument(state);
+      syncFormFromAppearance(state);
+      saveAppearance(state);
     });
   }
 }

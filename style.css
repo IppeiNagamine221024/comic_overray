@@ -11,6 +11,8 @@
 :root {
   --subtitle-font-family: "Segoe UI", "Hiragino Sans", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
   --subtitle-color: #111111;
+  /* 折り返しの目安（1ch ≒ 数字「0」の幅。日本語はおおよその文字数感） */
+  --subtitle-wrap-ch: 24;
 }
 
 html,
@@ -124,7 +126,7 @@ body {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  max-width: 70vw;
+  max-width: min(70vw, calc(var(--subtitle-wrap-ch, 24) * 2.7ch));
   width: max-content;
   min-width: 0;
   z-index: 5;
@@ -138,7 +140,7 @@ body {
   flex-direction: column;
   align-items: flex-start;
   position: relative;
-  max-width: 70vw;
+  max-width: min(70vw, calc(var(--subtitle-wrap-ch, 24) * 2.7ch));
 }
 
 .bubble-wrap--hidden {
@@ -258,6 +260,54 @@ body {
   box-shadow: -4px -6px 0 rgba(0, 0, 0, 0.22);
 }
 
+/* 左（吹き出しの左辺中央から左へ） */
+.bubble-wrap[data-tail-direction="side-left"] .bubble-tail {
+  left: -10px;
+  right: auto;
+  top: 50%;
+  bottom: auto;
+  margin-top: -14px;
+  width: 22px;
+  height: 28px;
+  border: 4px solid #111;
+  border-right: none;
+  border-top: none;
+  transform: rotate(45deg);
+  box-shadow: -3px 3px 0 rgba(0, 0, 0, 0.22);
+}
+
+/* 右（右辺中央から右へ） */
+.bubble-wrap[data-tail-direction="side-right"] .bubble-tail {
+  left: auto;
+  right: -10px;
+  top: 50%;
+  bottom: auto;
+  margin-top: -14px;
+  width: 22px;
+  height: 28px;
+  border: 4px solid #111;
+  border-left: none;
+  border-bottom: none;
+  transform: rotate(-45deg);
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.22);
+}
+
+/* 上（上辺中央から上へ） */
+.bubble-wrap[data-tail-direction="side-top"] .bubble-tail {
+  left: 50%;
+  right: auto;
+  top: -10px;
+  bottom: auto;
+  margin-left: -14px;
+  width: 28px;
+  height: 22px;
+  border: 4px solid #111;
+  border-bottom: none;
+  border-left: none;
+  transform: rotate(45deg);
+  box-shadow: 3px -3px 0 rgba(0, 0, 0, 0.22);
+}
+
 .bubble-wrap[data-volume-tier="quiet"] .bubble {
   opacity: 0.72;
   border-style: dashed;
@@ -315,7 +365,7 @@ body {
   z-index: 1;
   margin: 0;
   padding: 0.9rem 1.2rem;
-  max-width: 70vw;
+  max-width: min(70vw, calc(var(--subtitle-wrap-ch, 24) * 2.7ch));
   min-width: 120px;
   background: #fff;
   border-radius: 22px;
@@ -327,6 +377,7 @@ body {
 
 .subtitle {
   margin: 0;
+  max-width: 100%;
   font-family: var(--subtitle-font-family);
   color: var(--subtitle-color);
   font-size: clamp(1.05rem, 2.2vw, 1.55rem);
@@ -444,6 +495,10 @@ body {
   background: #fff;
   border: 2px solid #111;
   border-radius: 8px;
+}
+
+.settings-panel__number--wide {
+  width: 5.25rem;
 }
 
 .settings-panel__unit {
