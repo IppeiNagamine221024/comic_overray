@@ -47,6 +47,17 @@
         <input id="text-color-input" class="settings-panel__color" type="color" value="#111111" title="字幕の文字色" />
         <span id="text-color-hex" class="settings-panel__hex" aria-hidden="true">#111111</span>
       </div>
+      <div class="settings-panel__row settings-panel__row--inline">
+        <label class="settings-panel__label" for="bubble-border-color-input">枠の色</label>
+        <input
+          id="bubble-border-color-input"
+          class="settings-panel__color"
+          type="color"
+          value="#111111"
+          title="吹き出しの枠の色"
+        />
+        <span id="bubble-border-color-hex" class="settings-panel__hex" aria-hidden="true">#111111</span>
+      </div>
       <div class="settings-panel__row">
         <label class="settings-panel__label" for="tail-direction-select">しっぽの向き</label>
         <select id="tail-direction-select" class="settings-panel__select">
@@ -73,6 +84,12 @@
           title="おおよその折り返し文字数（6〜80）。幅は 1ch 単位で計算します。"
         />
         <span class="settings-panel__unit" aria-hidden="true">文字(大体の目安)</span>
+      </div>
+      <div class="settings-panel__row settings-panel__row--inline settings-panel__row--checkbox">
+        <input id="vertical-text-enabled" class="settings-panel__checkbox" type="checkbox" />
+        <label class="settings-panel__label settings-panel__label--grow" for="vertical-text-enabled">
+          縦読み（上から下、折り返しは右へ）
+        </label>
       </div>
       <div class="settings-panel__row settings-panel__row--inline">
         <label class="settings-panel__label" for="subtitle-duration-input">消えるまで</label>

@@ -54,9 +54,11 @@ const WRAP_CHAR_MAX = 80;
 const DEFAULT_APPEARANCE = {
   fontPreset: "default",
   textColor: "#111111",
+  bubbleBorderColor: "#111111",
   tailDirection: "left",
   subtitleHideDelayMs: 4000,
   wrapCharCount: 24,
+  verticalTextEnabled: false,
 };
 
 /** 現在の「字幕が消えるまで」の待ち時間（設定パネルと同期） */
@@ -86,9 +88,12 @@ const subtitleEl = document.getElementById("subtitle");
 const fontPresetSelect = document.getElementById("font-preset-select");
 const textColorInput = document.getElementById("text-color-input");
 const textColorHex = document.getElementById("text-color-hex");
+const bubbleBorderColorInput = document.getElementById("bubble-border-color-input");
+const bubbleBorderColorHex = document.getElementById("bubble-border-color-hex");
 const tailDirectionSelect = document.getElementById("tail-direction-select");
 const subtitleDurationInput = document.getElementById("subtitle-duration-input");
 const wrapCharCountInput = document.getElementById("wrap-char-count-input");
+const verticalTextEnabledInput = document.getElementById("vertical-text-enabled");
 
 // -----------------------------------------------------------------------------
 // ユーティリティ
@@ -129,13 +134,24 @@ function clampWrapCharCount(n) {
 }
 
 /**
+ * #rrggbb 形式の色かどうか
+ * @param {unknown} value
+ * @returns {value is string}
+ */
+function isHexColor(value) {
+  return typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value);
+}
+
+/**
  * localStorage から表示設定を読み込む（壊れた JSON はデフォルトへ）
  * @returns {{
  *   fontPreset: string,
  *   textColor: string,
+ *   bubbleBorderColor: string,
  *   tailDirection: string,
  *   subtitleHideDelayMs: number,
- *   wrapCharCount: number
+ *   wrapCharCount: number,
+ *   verticalTextEnabled: boolean
  * }}
  */
 function loadAppearance() {
@@ -149,10 +165,12 @@ function loadAppearance() {
       typeof parsed.fontPreset === "string" && parsed.fontPreset in FONT_PRESETS
         ? parsed.fontPreset
         : DEFAULT_APPEARANCE.fontPreset;
-    const textColor =
-      typeof parsed.textColor === "string" && /^#[0-9a-fA-F]{6}$/.test(parsed.textColor)
-        ? parsed.textColor
-        : DEFAULT_APPEARANCE.textColor;
+    const textColor = isHexColor(parsed.textColor)
+      ? parsed.textColor
+      : DEFAULT_APPEARANCE.textColor;
+    const bubbleBorderColor = isHexColor(parsed.bubbleBorderColor)
+      ? parsed.bubbleBorderColor
+      : DEFAULT_APPEARANCE.bubbleBorderColor;
     const tailDirection =
       typeof parsed.tailDirection === "string" && TAIL_DIRECTIONS.includes(parsed.tailDirection)
         ? parsed.tailDirection
@@ -165,7 +183,19 @@ function loadAppearance() {
       typeof parsed.wrapCharCount === "number" && Number.isFinite(parsed.wrapCharCount)
         ? clampWrapCharCount(parsed.wrapCharCount)
         : DEFAULT_APPEARANCE.wrapCharCount;
-    return { fontPreset, textColor, tailDirection, subtitleHideDelayMs, wrapCharCount };
+    const verticalTextEnabled =
+      typeof parsed.verticalTextEnabled === "boolean"
+        ? parsed.verticalTextEnabled
+        : DEFAULT_APPEARANCE.verticalTextEnabled;
+    return {
+      fontPreset,
+      textColor,
+      bubbleBorderColor,
+      tailDirection,
+      subtitleHideDelayMs,
+      wrapCharCount,
+      verticalTextEnabled,
+    };
   } catch {
     return { ...DEFAULT_APPEARANCE };
   }
@@ -176,9 +206,11 @@ function loadAppearance() {
  * @param {{
  *   fontPreset: string,
  *   textColor: string,
+ *   bubbleBorderColor: string,
  *   tailDirection: string,
  *   subtitleHideDelayMs: number,
- *   wrapCharCount: number
+ *   wrapCharCount: number,
+ *   verticalTextEnabled: boolean
  * }} state
  */
 function saveAppearance(state) {
@@ -194,9 +226,11 @@ function saveAppearance(state) {
  * @param {{
  *   fontPreset: string,
  *   textColor: string,
+ *   bubbleBorderColor: string,
  *   tailDirection: string,
  *   subtitleHideDelayMs: number,
- *   wrapCharCount: number
+ *   wrapCharCount: number,
+ *   verticalTextEnabled: boolean
  * }} state
  */
 function applyAppearanceToDocument(state) {
@@ -204,8 +238,18 @@ function applyAppearanceToDocument(state) {
   document.documentElement.style.setProperty("--subtitle-font-family", stack);
   document.documentElement.style.setProperty("--subtitle-color", state.textColor);
   document.documentElement.style.setProperty(
+    "--bubble-border-color",
+    isHexColor(state.bubbleBorderColor)
+      ? state.bubbleBorderColor
+      : DEFAULT_APPEARANCE.bubbleBorderColor,
+  );
+  document.documentElement.style.setProperty(
     "--subtitle-wrap-ch",
     String(clampWrapCharCount(state.wrapCharCount ?? DEFAULT_APPEARANCE.wrapCharCount)),
+  );
+  document.documentElement.classList.toggle(
+    "vertical-text-mode",
+    Boolean(state.verticalTextEnabled),
   );
 
   if (bubbleWrap) {
@@ -226,9 +270,11 @@ function applyAppearanceToDocument(state) {
  * @returns {{
  *   fontPreset: string,
  *   textColor: string,
+ *   bubbleBorderColor: string,
  *   tailDirection: string,
  *   subtitleHideDelayMs: number,
- *   wrapCharCount: number
+ *   wrapCharCount: number,
+ *   verticalTextEnabled: boolean
  * }}
  */
 function readAppearanceFromForm() {
@@ -236,9 +282,12 @@ function readAppearanceFromForm() {
     fontPresetSelect && fontPresetSelect.value in FONT_PRESETS
       ? fontPresetSelect.value
       : DEFAULT_APPEARANCE.fontPreset;
-  const textColor = textColorInput && /^#[0-9a-fA-F]{6}$/.test(textColorInput.value)
+  const textColor = textColorInput && isHexColor(textColorInput.value)
     ? textColorInput.value
     : DEFAULT_APPEARANCE.textColor;
+  const bubbleBorderColor = bubbleBorderColorInput && isHexColor(bubbleBorderColorInput.value)
+    ? bubbleBorderColorInput.value
+    : DEFAULT_APPEARANCE.bubbleBorderColor;
   const tailDirection =
     tailDirectionSelect && TAIL_DIRECTIONS.includes(tailDirectionSelect.value)
       ? tailDirectionSelect.value
@@ -261,8 +310,17 @@ function readAppearanceFromForm() {
     }
   }
   const wrapCharCount = clampWrapCharCount(wrapChars);
+  const verticalTextEnabled = Boolean(verticalTextEnabledInput?.checked);
 
-  return { fontPreset, textColor, tailDirection, subtitleHideDelayMs, wrapCharCount };
+  return {
+    fontPreset,
+    textColor,
+    bubbleBorderColor,
+    tailDirection,
+    subtitleHideDelayMs,
+    wrapCharCount,
+    verticalTextEnabled,
+  };
 }
 
 /**
@@ -270,9 +328,11 @@ function readAppearanceFromForm() {
  * @param {{
  *   fontPreset: string,
  *   textColor: string,
+ *   bubbleBorderColor: string,
  *   tailDirection: string,
  *   subtitleHideDelayMs: number,
- *   wrapCharCount: number
+ *   wrapCharCount: number,
+ *   verticalTextEnabled: boolean
  * }} state
  */
 function syncFormFromAppearance(state) {
@@ -285,6 +345,16 @@ function syncFormFromAppearance(state) {
   if (textColorHex) {
     textColorHex.textContent = state.textColor;
   }
+  if (bubbleBorderColorInput) {
+    bubbleBorderColorInput.value = isHexColor(state.bubbleBorderColor)
+      ? state.bubbleBorderColor
+      : DEFAULT_APPEARANCE.bubbleBorderColor;
+  }
+  if (bubbleBorderColorHex) {
+    bubbleBorderColorHex.textContent = isHexColor(state.bubbleBorderColor)
+      ? state.bubbleBorderColor
+      : DEFAULT_APPEARANCE.bubbleBorderColor;
+  }
   if (tailDirectionSelect) {
     tailDirectionSelect.value = TAIL_DIRECTIONS.includes(state.tailDirection)
       ? state.tailDirection
@@ -296,6 +366,9 @@ function syncFormFromAppearance(state) {
   }
   if (wrapCharCountInput) {
     wrapCharCountInput.value = String(clampWrapCharCount(state.wrapCharCount));
+  }
+  if (verticalTextEnabledInput) {
+    verticalTextEnabledInput.checked = Boolean(state.verticalTextEnabled);
   }
 }
 
@@ -313,7 +386,7 @@ function reapplySubtitleTimerIfVisible() {
 }
 
 /**
- * 下部パネル：フォント・色・しっぽ・表示時間の変更を監視して即時反映＆保存
+ * 下部パネル：見た目設定の変更を監視して即時反映＆保存
  */
 function initAppearanceControls() {
   if (!fontPresetSelect || !textColorInput) {
@@ -341,6 +414,20 @@ function initAppearanceControls() {
   textColorInput.addEventListener("change", () => {
     saveAppearance(readAppearanceFromForm());
   });
+
+  if (bubbleBorderColorInput) {
+    bubbleBorderColorInput.addEventListener("input", () => {
+      const state = readAppearanceFromForm();
+      applyAppearanceToDocument(state);
+      if (bubbleBorderColorHex) {
+        bubbleBorderColorHex.textContent = state.bubbleBorderColor;
+      }
+    });
+
+    bubbleBorderColorInput.addEventListener("change", () => {
+      saveAppearance(readAppearanceFromForm());
+    });
+  }
 
   if (tailDirectionSelect) {
     tailDirectionSelect.addEventListener("change", () => {
@@ -374,6 +461,14 @@ function initAppearanceControls() {
       const state = readAppearanceFromForm();
       applyAppearanceToDocument(state);
       syncFormFromAppearance(state);
+      saveAppearance(state);
+    });
+  }
+
+  if (verticalTextEnabledInput) {
+    verticalTextEnabledInput.addEventListener("change", () => {
+      const state = readAppearanceFromForm();
+      applyAppearanceToDocument(state);
       saveAppearance(state);
     });
   }

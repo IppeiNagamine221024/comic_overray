@@ -11,6 +11,7 @@
 :root {
   --subtitle-font-family: "Segoe UI", "Hiragino Sans", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
   --subtitle-color: #111111;
+  --bubble-border-color: #111111;
   /* 折り返しの目安（1ch ≒ 数字「0」の幅。日本語はおおよその文字数感） */
   --subtitle-wrap-ch: 24;
 }
@@ -176,7 +177,7 @@ body {
   width: 36px;
   height: 22px;
   background: #fff;
-  border: 4px solid #111;
+  border: 4px solid var(--bubble-border-color);
   border-top: none;
   border-right: none;
   transform: skewX(-18deg) rotate(-35deg);
@@ -190,7 +191,7 @@ body {
   right: 12%;
   top: auto;
   bottom: -14px;
-  border: 4px solid #111;
+  border: 4px solid var(--bubble-border-color);
   border-top: none;
   border-left: none;
   transform: skewX(18deg) rotate(35deg);
@@ -204,7 +205,7 @@ body {
   top: auto;
   bottom: -14px;
   margin-left: -18px;
-  border: 4px solid #111;
+  border: 4px solid var(--bubble-border-color);
   border-top: none;
   border-right: none;
   transform: skewX(0deg) rotate(-40deg);
@@ -217,7 +218,7 @@ body {
   right: auto;
   top: -14px;
   bottom: auto;
-  border: 4px solid #111;
+  border: 4px solid var(--bubble-border-color);
   border-bottom: none;
   border-right: none;
   transform: skewX(18deg) rotate(35deg);
@@ -230,7 +231,7 @@ body {
   right: 12%;
   top: -14px;
   bottom: auto;
-  border: 4px solid #111;
+  border: 4px solid var(--bubble-border-color);
   border-bottom: none;
   border-left: none;
   transform: skewX(-18deg) rotate(-35deg);
@@ -246,7 +247,7 @@ body {
   margin-top: -14px;
   width: 22px;
   height: 28px;
-  border: 4px solid #111;
+  border: 4px solid var(--bubble-border-color);
   border-right: none;
   border-top: none;
   transform: rotate(45deg);
@@ -262,7 +263,7 @@ body {
   margin-top: -14px;
   width: 22px;
   height: 28px;
-  border: 4px solid #111;
+  border: 4px solid var(--bubble-border-color);
   border-left: none;
   border-bottom: none;
   transform: rotate(-45deg);
@@ -278,7 +279,7 @@ body {
   margin-left: -14px;
   width: 28px;
   height: 22px;
-  border: 4px solid #111;
+  border: 4px solid var(--bubble-border-color);
   border-bottom: none;
   border-left: none;
   transform: rotate(45deg);
@@ -294,7 +295,7 @@ body {
   min-width: 120px;
   background: #fff;
   border-radius: 22px;
-  border: 5px solid #111;
+  border: 5px solid var(--bubble-border-color);
   box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.28);
   word-break: break-word;
   overflow-wrap: anywhere;
@@ -319,6 +320,18 @@ body {
     2px -2px 0 #fff,
     -2px -2px 0 #fff,
     0 0 6px rgba(0, 0, 0, 0.25);
+}
+
+.vertical-text-mode .bubble {
+  max-width: min(70vw, 100%);
+  max-height: min(56vh, calc(var(--subtitle-wrap-ch, 24) * 1.75em));
+}
+
+.vertical-text-mode .subtitle {
+  writing-mode: vertical-lr;
+  text-orientation: upright;
+  max-height: min(50vh, calc(var(--subtitle-wrap-ch, 24) * 1.45em));
+  max-width: none;
 }
 
 /* -----------------------------------------------------------------------------
@@ -371,10 +384,26 @@ body {
   align-items: center;
 }
 
+.settings-panel__row--checkbox {
+  align-items: center;
+}
+
 .settings-panel__label {
   flex: 0 0 5.5rem;
   font-size: 0.85rem;
   font-weight: 700;
+}
+
+.settings-panel__label--grow {
+  flex: 1 1 auto;
+  max-width: none;
+}
+
+.settings-panel__checkbox {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex-shrink: 0;
+  cursor: pointer;
 }
 
 .settings-panel__select {
