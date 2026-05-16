@@ -328,7 +328,7 @@ body {
 }
 
 .vertical-text-mode .subtitle {
-  writing-mode: vertical-lr;
+  writing-mode: vertical-rl;
   text-orientation: upright;
   max-height: min(50vh, calc(var(--subtitle-wrap-ch, 24) * 1.45em));
   max-width: none;
